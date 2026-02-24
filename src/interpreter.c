@@ -330,7 +330,54 @@ Do not change EIP in this function.
 HINT: you may use get_memory_type in this function.
 */
 ExecResult execute_pop(System *sys, char *dst) {
-  // TODO
+  MemoryType src_duc = get_memory_type(src);
+
+  
+  if (src_duc.type == UNKNOWN) {
+    return INSTRUCTION_ERROR;
+  }
+
+  int src_value = 0;
+  int src_address = 0;
+
+  
+
+  if (src_duc.type == REG) {
+    src_value = sys->registers[src_duc.reg];
+  }
+  else if (src_duc.type == CONST) {
+    src_value = src_duc.value;
+  }
+  else {  // MEM
+    src_address = sys->registers[src_duc.reg] + src_duc.value;
+
+    if (src_address < 0 || 
+        src_address > (MEMORY_SIZE - 1) * 4 || 
+        src_address % 4 != 0) {
+      return MEMORY_ERROR;
+    }
+
+    src_value = sys->memory.data[src_address / 4];
+  }
+
+  
+
+  int old_esp = sys->registers[ESP];
+  int new_esp = old_esp - 4;
+
+  
+  if (new_esp < 4 || new_esp >= MEMORY_SIZE * 4 || new_esp % 4 != 0) {
+    return MEMORY_ERROR;
+  }
+
+  
+
+  sys->memory.data[new_esp / 4] = src_value;
+
+  
+
+  sys->registers[ESP] = new_esp;
+
   return SUCCESS;
 }
 
