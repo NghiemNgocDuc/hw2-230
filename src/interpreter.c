@@ -378,30 +378,35 @@ HINT: you may use get_memory_type in this function.
 ExecResult execute_pop(System *sys, char *dst) {
     MemoryType dst_duc = get_memory_type(dst);
 
-    
     if (dst_duc.type == UNKNOWN || dst_duc.type == CONST) {
         return INSTRUCTION_ERROR;
     }
 
-    int esp = sys->registers[ESP];
+    int old_esp = sys->registers[ESP];
 
-    
-    if (esp < 0 || esp >= MEMORY_SIZE * 4 || esp % 4 != 0) {
+    if (old_esp < 0 || old_esp >= MEMORY_SIZE * 4 || old_esp % 4 != 0) {
+        return MEMORY_ERROR;
+    }
+
+    int value = sys->memory.data[old_esp / 4];
+
+    int new_esp = old_esp + 4;
+
+    if (new_esp < 0 || new_esp > MEMORY_SIZE * 4 || new_esp % 4 != 0) {
         return MEMORY_ERROR;
     }
 
     
-    int value = sys->memory.data[esp / 4];
+    sys->registers[ESP] = new_esp;
 
     
     if (dst_duc.type == REG) {
         sys->registers[dst_duc.reg] = value;
-    }
-    else {  // MEM
+    } else {
         int dst_address = sys->registers[dst_duc.reg] + dst_duc.value;
 
-        if (dst_address < 0 || 
-            dst_address >= MEMORY_SIZE * 4 || 
+        if (dst_address < 0 ||
+            dst_address >= MEMORY_SIZE * 4 ||
             dst_address % 4 != 0) {
             return MEMORY_ERROR;
         }
@@ -409,12 +414,8 @@ ExecResult execute_pop(System *sys, char *dst) {
         sys->memory.data[dst_address / 4] = value;
     }
 
-    
-    sys->registers[ESP] = esp + 4;
-
     return SUCCESS;
 }
-
 /*
 The execute_cmpl function validates and executes a cmpl instruction, ensuring
 the source and destination operands are of known and appropriate types, and then
