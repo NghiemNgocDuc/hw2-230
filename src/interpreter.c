@@ -307,29 +307,6 @@ Do not change EIP in this function.
 HINT: you may use get_memory_type in this function.
 */
 ExecResult execute_push(System *sys, char *src) {
-  // TODO
-  return SUCCESS;
-}
-
-/*
-The execute_pop function validates and executes a popl instruction, ensuring the
-destination operand is of known and appropriate type, and then performs the pop
-operation if valid.
-
-It will return SUCCESS if there is no error.
-It will return INSTRUCTION_ERROR if dst is not a register or memory address.
-It will return MEMORY_ERROR if dst is an invalid memory address: less than 0, or
-greater than (MEMORY_SIZE - 1) * 4).
-It will return MEMORY_ERROR if the
-address stored in esp is an invalid memory address: less than 0, or
-greater than (MEMORY_SIZE - 1) * 4).
-
-If there is any error, all the system registers, memory, and
-system status should remain unchanged.
-Do not change EIP in this function.
-HINT: you may use get_memory_type in this function.
-*/
-ExecResult execute_pop(System *sys, char *dst) {
   MemoryType src_duc = get_memory_type(src);
 
   
@@ -365,20 +342,77 @@ ExecResult execute_pop(System *sys, char *dst) {
   int old_esp = sys->registers[ESP];
   int new_esp = old_esp - 4;
 
-  
+ 
   if (new_esp < 4 || new_esp >= MEMORY_SIZE * 4 || new_esp % 4 != 0) {
     return MEMORY_ERROR;
   }
 
   
-
   sys->memory.data[new_esp / 4] = src_value;
 
-  
+ 
 
   sys->registers[ESP] = new_esp;
 
   return SUCCESS;
+}
+
+/*
+The execute_pop function validates and executes a popl instruction, ensuring the
+destination operand is of known and appropriate type, and then performs the pop
+operation if valid.
+
+It will return SUCCESS if there is no error.
+It will return INSTRUCTION_ERROR if dst is not a register or memory address.
+It will return MEMORY_ERROR if dst is an invalid memory address: less than 0, or
+greater than (MEMORY_SIZE - 1) * 4).
+It will return MEMORY_ERROR if the
+address stored in esp is an invalid memory address: less than 0, or
+greater than (MEMORY_SIZE - 1) * 4).
+
+If there is any error, all the system registers, memory, and
+system status should remain unchanged.
+Do not change EIP in this function.
+HINT: you may use get_memory_type in this function.
+*/
+ExecResult execute_pop(System *sys, char *dst) {
+    MemoryType dst_duc = get_memory_type(dst);
+
+    
+    if (dst_duc.type == UNKNOWN || dst_duc.type == CONST) {
+        return INSTRUCTION_ERROR;
+    }
+
+    int esp = sys->registers[ESP];
+
+    
+    if (esp < 0 || esp >= MEMORY_SIZE * 4 || esp % 4 != 0) {
+        return MEMORY_ERROR;
+    }
+
+    
+    int value = sys->memory.data[esp / 4];
+
+    
+    if (dst_duc.type == REG) {
+        sys->registers[dst_duc.reg] = value;
+    }
+    else {  // MEM
+        int dst_address = sys->registers[dst_duc.reg] + dst_duc.value;
+
+        if (dst_address < 0 || 
+            dst_address >= MEMORY_SIZE * 4 || 
+            dst_address % 4 != 0) {
+            return MEMORY_ERROR;
+        }
+
+        sys->memory.data[dst_address / 4] = value;
+    }
+
+    
+    sys->registers[ESP] = esp + 4;
+
+    return SUCCESS;
 }
 
 /*
