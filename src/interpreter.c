@@ -384,34 +384,32 @@ ExecResult execute_pop(System *sys, char *dst) {
 
     int old_esp = sys->registers[ESP];
 
-    
-    if (old_esp < 0 || old_esp >= MEMORY_SIZE * 4 || old_esp % 4 != 0) {
+    if (old_esp < 0 || old_esp > (MEMORY_SIZE - 1) * 4 || old_esp % 4 != 0) {
         return MEMORY_ERROR;
     }
 
     int value = sys->memory.data[old_esp / 4];
+    int incremented_esp = old_esp + 4;
 
     
-    int incremented_esp = old_esp + 4;
-    if (incremented_esp < 0 || incremented_esp > MEMORY_SIZE * 4 || incremented_esp % 4 != 0) {
+    if (incremented_esp < 0 || incremented_esp > MEMORY_SIZE * 4) {
         return MEMORY_ERROR;
     }
 
-    
     if (dst_duc.type == REG) {
         
-        sys->registers[ESP] = incremented_esp;
-        
         sys->registers[dst_duc.reg] = value;
-    } else {
         
+       
+        sys->registers[ESP] = sys->registers[ESP] + 4;
+        
+    } else { // MEM Case
         int dst_address = sys->registers[dst_duc.reg] + dst_duc.value;
 
-        if (dst_address < 0 || dst_address >= MEMORY_SIZE * 4 || dst_address % 4 != 0) {
+        if (dst_address < 0 || dst_address > (MEMORY_SIZE - 1) * 4 || dst_address % 4 != 0) {
             return MEMORY_ERROR;
         }
 
-       
         sys->memory.data[dst_address / 4] = value;
         sys->registers[ESP] = incremented_esp;
     }
