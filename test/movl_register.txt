@@ -1,0 +1,8 @@
+MOVL %EDX %EAX  
+MOVL %ECX %EDX    
+MOVL %EAX %ECX 
+END
+
+
+
+
