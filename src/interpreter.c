@@ -436,7 +436,56 @@ Do not change EIP in this function.
 HINT: you may use get_memory_type in this function.
 */
 ExecResult execute_cmpl(System *sys, char *src, char *dst) {
-  // TODO
+  MemoryType src_duc = get_memory_type(src);
+  MemoryType dst_duc = get_memory_type(dst);
+
+  
+  if (src_duc.type == UNKNOWN || dst_duc.type == UNKNOWN) {
+    return INSTRUCTION_ERROR;
+  }
+
+  if (src_duc.type == MEM && dst_duc.type == MEM) {
+    return INSTRUCTION_ERROR;
+  }
+    
+  
+  if (dst_duc.type == CONST) {
+    return INSTRUCTION_ERROR;
+  }
+
+  int src_value = 0;
+  int dst_value = 0;
+  int address = 0;
+
+  if (src_duc.type == REG) {
+    src_value = sys->registers[src_duc.reg];
+  } else if (src_duc.type == CONST) {
+    src_value = src_duc.value;
+  } else if (src_duc.type == MEM) {
+    address = sys->registers[src_duc.reg] + src_duc.value;
+    if (address < 0 || address > (MEMORY_SIZE - 1) * 4 || address % 4 != 0) {
+      return MEMORY_ERROR;
+    }
+    src_value = sys->memory.data[address / 4];
+  }
+
+  if (dst_duc.type == REG) {
+    dst_value = sys->registers[dst_duc.reg];
+  } else if (dst_duc.type == MEM) {
+    address = sys->registers[dst_duc.reg] + dst_duc.value;
+    if (address < 0 || address > (MEMORY_SIZE - 1) * 4 || address % 4 != 0) {
+      return MEMORY_ERROR;
+    }
+    dst_value = sys->memory.data[address / 4];
+  }
+
+  if (dst_value == src_value) {
+    sys->comparison_flag = 0;
+  } else if (dst_value > src_value) {
+    sys->comparison_flag = 1;
+  } else {
+    sys->comparison_flag = -1;
+  }
   return SUCCESS;
 }
 
@@ -457,7 +506,32 @@ Please update program counter (EIP) in this function.
 HINT: you may use get_addr_from_label in this function.
 */
 ExecResult execute_jmp(System *sys, char *condition, char *dst) {
-  // TODO
+  int target_address = get_addr_from_label(sys, dst);
+
+ 
+  if (target_address == -1) {
+    return PC_ERROR;
+  }
+
+  int should_jump = 0;
+
+  if (strcmp(condition, "JMP") == 0) {
+    should_jump = 1;
+  } else if (strcmp(condition, "JE") == 0) {
+    if (sys->comparison_flag == 0) should_jump = 1;
+  } else if (strcmp(condition, "JNE") == 0) {
+    if (sys->comparison_flag != 0) should_jump = 1;
+  } else if (strcmp(condition, "JL") == 0) {
+    if (sys->comparison_flag == -1) should_jump = 1;
+  } else if (strcmp(condition, "JG") == 0) {
+    if (sys->comparison_flag == 1) should_jump = 1;
+  }
+  if (should_jump) {
+    sys->registers[EIP] = target_address;
+  } else {
+    
+  }
+  
   return SUCCESS;
 }
 
@@ -475,7 +549,27 @@ Please update program counter (EIP) in this function.
 HINT: you may use get_addr_from_label in this function.
 */
 ExecResult execute_call(System *sys, char *dst) {
-  // TODO
+  int target_address = get_addr_from_label(sys, dst);
+  if (target_address == -1) {
+    return PC_ERROR;
+  }
+
+ 
+  int return_address = sys->registers[EIP] + 4;
+  int old_esp = sys->registers[ESP];
+  int new_esp = old_esp - 4;
+
+  
+  if (new_esp < 4 || new_esp >= MEMORY_SIZE * 4 || new_esp % 4 != 0) {
+    return MEMORY_ERROR;
+  }
+
+ 
+  sys->memory.data[new_esp / 4] = return_address;
+
+  
+  sys->registers[ESP] = new_esp;
+  sys->registers[EIP] = target_address;
   return SUCCESS;
 }
 
@@ -492,7 +586,20 @@ memory, and system status should remain unchanged.
 Please update program counter (EIP) in this function.
 */
 ExecResult execute_ret(System *sys) {
-  // TODO
+  int current_esp = sys->registers[ESP];
+
+  
+  if (current_esp < 0 || current_esp > (MEMORY_SIZE - 1) * 4 || current_esp % 4 != 0) {
+    return MEMORY_ERROR;
+  }
+  int ret_addr = sys->memory.data[current_esp / 4];
+
+ 
+  if (ret_addr < 0 || ret_addr >= sys->memory.num_instructions * 4 || ret_addr % 4 != 0) {
+    return PC_ERROR;
+  }
+  sys->registers[EIP] = ret_addr;
+  sys->registers[ESP] = current_esp + 4;
   return SUCCESS;
 }
 
@@ -508,7 +615,89 @@ Please update program counter (EIP) for MOVL, ADDL, PUSHL, POPL, and CMPL in
 this function.
 */
 void execute_instructions(System *sys) {
-  char inst[256];  // you can use strcpy to copy instruction from memory to this
-                   // variable
-  // TODO
+  char inst[256];
+  ExecResult result = SUCCESS;
+
+  while (result == SUCCESS) {
+    
+    int current_pc = sys->registers[EIP];
+    int instruction_idx = current_pc / 4;
+
+   
+    if (instruction_idx < 0 || instruction_idx >= sys->memory.num_instructions) {
+      break; 
+    }
+
+    char *raw_line = sys->memory.instruction[instruction_idx];
+    if (raw_line == NULL) break;
+
+    
+    strcpy(inst, raw_line);
+
+   
+    char *opcode = strtok(inst, " ");
+    if (opcode == NULL) {
+      sys->registers[EIP] += 4;
+      continue;
+    }
+
+    
+    if (strcmp(opcode, "END") == 0) {
+      break;
+    }
+
+    
+    if (strcmp(opcode, "MOVL") == 0) {
+      char *src = strtok(NULL, ", ");
+      char *dst = strtok(NULL, ", ");
+      result = execute_movl(sys, src, dst);
+      if (result == SUCCESS) sys->registers[EIP] += 4;
+
+    } else if (strcmp(opcode, "ADDL") == 0) {
+      char *src = strtok(NULL, ", ");
+      char *dst = strtok(NULL, ", ");
+      result = execute_addl(sys, src, dst);
+      if (result == SUCCESS) sys->registers[EIP] += 4;
+
+    } else if (strcmp(opcode, "PUSHL") == 0) {
+      char *src = strtok(NULL, " ");
+      result = execute_push(sys, src);
+      if (result == SUCCESS) sys->registers[EIP] += 4;
+
+    } else if (strcmp(opcode, "POPL") == 0) {
+      char *dst = strtok(NULL, " ");
+      result = execute_pop(sys, dst);
+      if (result == SUCCESS) sys->registers[EIP] += 4;
+
+    } else if (strcmp(opcode, "CMPL") == 0) {
+      char *src = strtok(NULL, ", ");
+      char *dst = strtok(NULL, ", ");
+      result = execute_cmpl(sys, src, dst);
+      if (result == SUCCESS) sys->registers[EIP] += 4;
+
+    } else if (strcmp(opcode, "CALL") == 0) {
+      char *label = strtok(NULL, " ");
+      result = execute_call(sys, label);
+      
+
+    } else if (strcmp(opcode, "RET") == 0) {
+      result = execute_ret(sys);
+      
+
+    } else if (opcode[0] == 'J') { 
+      char *label = strtok(NULL, " ");
+      
+      int old_eip = sys->registers[EIP];
+      result = execute_jmp(sys, opcode, label);
+      
+      
+      if (result == SUCCESS && sys->registers[EIP] == old_eip) {
+        sys->registers[EIP] += 4;
+      }
+
+    } else {
+      
+      sys->registers[EIP] += 4;
+    }
+  }
 }
