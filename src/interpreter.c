@@ -439,7 +439,7 @@ ExecResult execute_cmpl(System *sys, char *src, char *dst) {
   MemoryType src_duc = get_memory_type(src);
   MemoryType dst_duc = get_memory_type(dst);
 
-  
+
   if (src_duc.type == UNKNOWN || dst_duc.type == UNKNOWN) {
     return INSTRUCTION_ERROR;
   }
@@ -447,16 +447,12 @@ ExecResult execute_cmpl(System *sys, char *src, char *dst) {
   if (src_duc.type == MEM && dst_duc.type == MEM) {
     return INSTRUCTION_ERROR;
   }
-    
-  
-  if (dst_duc.type == CONST) {
-    return INSTRUCTION_ERROR;
-  }
 
   int src_value = 0;
   int dst_value = 0;
   int address = 0;
 
+ 
   if (src_duc.type == REG) {
     src_value = sys->registers[src_duc.reg];
   } else if (src_duc.type == CONST) {
@@ -469,8 +465,12 @@ ExecResult execute_cmpl(System *sys, char *src, char *dst) {
     src_value = sys->memory.data[address / 4];
   }
 
+
   if (dst_duc.type == REG) {
     dst_value = sys->registers[dst_duc.reg];
+  } else if (dst_duc.type == CONST) {
+
+    dst_value = dst_duc.value; 
   } else if (dst_duc.type == MEM) {
     address = sys->registers[dst_duc.reg] + dst_duc.value;
     if (address < 0 || address > (MEMORY_SIZE - 1) * 4 || address % 4 != 0) {
@@ -479,6 +479,7 @@ ExecResult execute_cmpl(System *sys, char *src, char *dst) {
     dst_value = sys->memory.data[address / 4];
   }
 
+  
   if (dst_value == src_value) {
     sys->comparison_flag = 0;
   } else if (dst_value > src_value) {
@@ -486,6 +487,7 @@ ExecResult execute_cmpl(System *sys, char *src, char *dst) {
   } else {
     sys->comparison_flag = -1;
   }
+
   return SUCCESS;
 }
 
@@ -508,8 +510,9 @@ HINT: you may use get_addr_from_label in this function.
 ExecResult execute_jmp(System *sys, char *condition, char *dst) {
   int target_address = get_addr_from_label(sys, dst);
 
- 
+
   if (target_address == -1) {
+   
     return PC_ERROR;
   }
 
@@ -526,11 +529,12 @@ ExecResult execute_jmp(System *sys, char *condition, char *dst) {
   } else if (strcmp(condition, "JG") == 0) {
     if (sys->comparison_flag == 1) should_jump = 1;
   }
+
+  
   if (should_jump) {
     sys->registers[EIP] = target_address;
-  } else {
-    
   }
+
   
   return SUCCESS;
 }
@@ -618,12 +622,12 @@ void execute_instructions(System *sys) {
   char inst[256];
   ExecResult result = SUCCESS;
 
+  
   while (result == SUCCESS) {
-    
     int current_pc = sys->registers[EIP];
     int instruction_idx = current_pc / 4;
 
-   
+ 
     if (instruction_idx < 0 || instruction_idx >= sys->memory.num_instructions) {
       break; 
     }
@@ -631,22 +635,19 @@ void execute_instructions(System *sys) {
     char *raw_line = sys->memory.instruction[instruction_idx];
     if (raw_line == NULL) break;
 
-    
     strcpy(inst, raw_line);
 
-   
+    
     char *opcode = strtok(inst, " ");
-    if (opcode == NULL) {
+    if (opcode == NULL || opcode[0] == '.') {
+
       sys->registers[EIP] += 4;
       continue;
     }
 
-    
-    if (strcmp(opcode, "END") == 0) {
-      break;
-    }
+    if (strcmp(opcode, "END") == 0) break;
 
-    
+
     if (strcmp(opcode, "MOVL") == 0) {
       char *src = strtok(NULL, ", ");
       char *dst = strtok(NULL, ", ");
@@ -678,25 +679,23 @@ void execute_instructions(System *sys) {
     } else if (strcmp(opcode, "CALL") == 0) {
       char *label = strtok(NULL, " ");
       result = execute_call(sys, label);
-      
+
 
     } else if (strcmp(opcode, "RET") == 0) {
       result = execute_ret(sys);
-      
+
 
     } else if (opcode[0] == 'J') { 
       char *label = strtok(NULL, " ");
-      
       int old_eip = sys->registers[EIP];
+      
       result = execute_jmp(sys, opcode, label);
-      
-      
+    
       if (result == SUCCESS && sys->registers[EIP] == old_eip) {
         sys->registers[EIP] += 4;
       }
 
     } else {
-      
       sys->registers[EIP] += 4;
     }
   }
