@@ -622,7 +622,6 @@ void execute_instructions(System *sys) {
   char inst[256];
   ExecResult result = SUCCESS;
 
-  
   while (result == SUCCESS) {
     int current_pc = sys->registers[EIP];
     int instruction_idx = current_pc / 4;
@@ -639,12 +638,14 @@ void execute_instructions(System *sys) {
 
     
     char *opcode = strtok(inst, " ");
+    
+    
     if (opcode == NULL || opcode[0] == '.') {
-
       sys->registers[EIP] += 4;
       continue;
     }
 
+   
     if (strcmp(opcode, "END") == 0) break;
 
 
@@ -678,24 +679,26 @@ void execute_instructions(System *sys) {
 
     } else if (strcmp(opcode, "CALL") == 0) {
       char *label = strtok(NULL, " ");
+     
       result = execute_call(sys, label);
 
-
     } else if (strcmp(opcode, "RET") == 0) {
+      
       result = execute_ret(sys);
-
 
     } else if (opcode[0] == 'J') { 
       char *label = strtok(NULL, " ");
       int old_eip = sys->registers[EIP];
       
       result = execute_jmp(sys, opcode, label);
-    
+      
+      
       if (result == SUCCESS && sys->registers[EIP] == old_eip) {
-        sys->registers[EIP] += 4;
+        sys->registers[EIP] = old_eip + 4;
       }
 
     } else {
+     
       sys->registers[EIP] += 4;
     }
   }
