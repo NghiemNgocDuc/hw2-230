@@ -626,18 +626,17 @@ void execute_instructions(System *sys) {
     int current_pc = sys->registers[EIP];
     int instruction_idx = current_pc / 4;
 
- 
     if (instruction_idx < 0 || instruction_idx >= sys->memory.num_instructions) {
       break; 
     }
 
     char *raw_line = sys->memory.instruction[instruction_idx];
-    if (raw_line == NULL) break;
+    if (raw_line == NULL || strcmp(raw_line, "END") == 0) break;
 
     strcpy(inst, raw_line);
-
     
-    char *opcode = strtok(inst, " ");
+
+    char *opcode = strtok(inst, " ,");
     
     
     if (opcode == NULL || opcode[0] == '.') {
@@ -645,61 +644,54 @@ void execute_instructions(System *sys) {
       continue;
     }
 
-   
-    if (strcmp(opcode, "END") == 0) break;
+    int eip_before = sys->registers[EIP];
 
-
+    
     if (strcmp(opcode, "MOVL") == 0) {
-      char *src = strtok(NULL, ", ");
-      char *dst = strtok(NULL, ", ");
+      char *src = strtok(NULL, " ,");
+      char *dst = strtok(NULL, " ,");
       result = execute_movl(sys, src, dst);
-      if (result == SUCCESS) sys->registers[EIP] += 4;
 
     } else if (strcmp(opcode, "ADDL") == 0) {
-      char *src = strtok(NULL, ", ");
-      char *dst = strtok(NULL, ", ");
+      char *src = strtok(NULL, " ,");
+      char *dst = strtok(NULL, " ,");
       result = execute_addl(sys, src, dst);
-      if (result == SUCCESS) sys->registers[EIP] += 4;
 
     } else if (strcmp(opcode, "PUSHL") == 0) {
-      char *src = strtok(NULL, " ");
+      char *src = strtok(NULL, " ,");
       result = execute_push(sys, src);
-      if (result == SUCCESS) sys->registers[EIP] += 4;
 
     } else if (strcmp(opcode, "POPL") == 0) {
-      char *dst = strtok(NULL, " ");
+      char *dst = strtok(NULL, " ,");
       result = execute_pop(sys, dst);
-      if (result == SUCCESS) sys->registers[EIP] += 4;
 
     } else if (strcmp(opcode, "CMPL") == 0) {
-      char *src = strtok(NULL, ", ");
-      char *dst = strtok(NULL, ", ");
+      char *src = strtok(NULL, " ,");
+      char *dst = strtok(NULL, " ,");
       result = execute_cmpl(sys, src, dst);
-      if (result == SUCCESS) sys->registers[EIP] += 4;
 
     } else if (strcmp(opcode, "CALL") == 0) {
-      char *label = strtok(NULL, " ");
-     
+      char *label = strtok(NULL, " ,");
       result = execute_call(sys, label);
 
     } else if (strcmp(opcode, "RET") == 0) {
-      
       result = execute_ret(sys);
 
     } else if (opcode[0] == 'J') { 
-      char *label = strtok(NULL, " ");
-      int old_eip = sys->registers[EIP];
-      
+      char *label = strtok(NULL, " ,");
       result = execute_jmp(sys, opcode, label);
       
-      
-      if (result == SUCCESS && sys->registers[EIP] == old_eip) {
-        sys->registers[EIP] = old_eip + 4;
-      }
-
     } else {
-     
+      // Unrecognized instruction
       sys->registers[EIP] += 4;
+      continue;
+    }
+
+    
+    if (result == SUCCESS) {
+      if (sys->registers[EIP] == eip_before) {
+        sys->registers[EIP] += 4;
+      }
     }
   }
 }
