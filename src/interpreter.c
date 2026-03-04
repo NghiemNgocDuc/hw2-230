@@ -533,9 +533,10 @@ ExecResult execute_jmp(System *sys, char *condition, char *dst) {
   
   if (should_jump) {
     sys->registers[EIP] = target_address;
+  } else {
+    sys->registers[EIP] += 4;
   }
 
-  
   return SUCCESS;
 }
 
